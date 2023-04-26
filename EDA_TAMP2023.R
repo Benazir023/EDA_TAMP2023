@@ -1,0 +1,298 @@
+#Setting up
+
+library(tidyverse)
+getwd()
+setwd("D:/BENA/Data Analytics/Projects/EDA_TAMP2023")
+save.image("EDA_TAMP2023.RData")
+savehistory("EDA_TAMP2023.Rhistory")
+
+#Importing data sets
+
+abuja <- read.csv("D:/BENA/Data Analytics/Projects/EDA_TAMP2023/Abuja_Branch.csv")
+lagos <- read.csv("D:/BENA/Data Analytics/Projects/EDA_TAMP2023/Lagos_Branch.csv")
+port_harcourt <- read.csv("D:/BENA/Data Analytics/Projects/EDA_TAMP2023/Port_Harcourt_Branch.csv")
+
+#Confirming compatibility before combining data sets
+
+colnames(abuja)
+colnames(lagos)
+colnames(port_harcourt)
+
+str(abuja)
+str(lagos)
+str(port_harcourt)
+
+glimpse(abuja)
+glimpse(lagos)
+glimpse(port_harcourt)
+
+
+head(abuja)
+head(lagos)
+head(port_harcourt)
+
+
+#Data wrangling & combination of data sets
+
+combined_branches <- rbind(abuja,lagos,port_harcourt)
+
+#About the data
+
+colnames(combined_branches)
+glimpse(combined_branches)
+head(combined_branches)
+str(combined_branches)
+dim(combined_branches)
+View(combined_branches)
+skimr::skim_without_charts(combined_branches)
+
+#The skim_without_charts() function revealed that there are no missing values or whitespaces. Thus, we'll be working with 1000 observations & 17 variables
+# The mean values for all numeric variables are as shown in the mean column under skim_without_charts() results
+
+#Data cleaning
+# a. Standardize column names
+
+names(combined_branches) <- tolower(names(combined_branches))
+
+# b.Rename columns so they're more meaningful
+
+names(combined_branches)[14] <- 'total.price'  # cogs to total price
+names(combined_branches)[9] <- 'tax'  #tax.5 to tax
+names(combined_branches2)[10] <- 'total.price.with.tax'    #total to total revenue
+
+# c.Convert data type for date column from chr to date 
+
+library(lubridate)
+
+combined_branches$standard_date <- lubridate::mdy(combined_branches$date)
+class(std_date)
+
+#Alternatively, convert to date & extract month
+
+library(dplyr)
+
+std_date_time <- combined_branches %>%
+  mutate(new_date = mdy(date)) %>%
+  summarise(month = month(new_date))   #didn't work
+
+# d.Convert data type for time column from chr to time
+
+combined_branches$standard_time <- lubridate::hm(combined_branches$time)
+
+#The tax column & gross income have the same values, so we can do away with either of them
+#Select the columns to be used - delete date, time, gross.margin.percentage,gross.income, won't be used in our analysis
+
+combined_branches2 <- combined_branches[,-c(11,12,15,16)]
+
+#Rearrange columns
+
+library(dplyr)
+
+combined_branches2[,c(1,2,3,4,5,6,7,8,12,9,10,11,13,14,15)]
+
+subset(combined_branches2, select=c(1,2,3,4,5,6,7,8,12,9,10,11,13,14,15))
+
+View(combined_branches2)  #above 2 only changed appearance in console
+
+branches_reordered <- combined_branches2 %>% 
+  select(invoice.id,branch,city,customer.type,gender,product.line,unit.price,quantity,total.price,tax,total.price.with.tax,payment,rating,standard_date,standard_time)
+
+#code in above line reordered columns in data frame also  
+
+#Unique entries for each column
+
+list_unique <- lapply(branches_reordered,unique)
+list_unique
+class(list_unique)
+
+#About data
+
+product_summary <- branches_reordered %>%
+  group_by(product.line) %>%
+  summarise(number = n()) %>%
+  arrange(-number)
+
+customer.type_summary <- branches_reordered %>%
+  group_by(customer.type) %>%
+  summarise(number = n())
+
+payment_summary <- branches_reordered %>%
+  group_by(payment) %>%
+  summarise(number = n())
+  
+#a.About ratings
+
+ratings_summary <- branches_reordered %>%
+  group_by(product.line) %>%
+  summarise(
+    max_rating = max(rating),
+    min_rating = min(rating),
+    avg_rating = mean(rating)
+  )
+View(ratings_summary)
+
+#They range from about 4.0 to 10.0 for all 6 product.lines
+
+#Categorize ratings
+branches_reordered <- branches_reordered %>%
+  mutate(
+    rating_category = case_when(
+      rating <=6.0 ~ "low",
+      rating >=8.0 ~ "high",
+      TRUE ~ "medium"
+    )
+  )
+
+aggregate(invoice.id ~ product.line + rating_category,
+          data = branches_reordered,
+          FUN = length)
+
+#Food and beverages had the most number of rated highly  while Home and lifestyle & Electronic accessories product lines had the most number of invoices/sales rated lowly.
+#The best performing product.lines considering average ratings are: Food & beverages followed by Fashion accessories
+#Medium ratings constituted 33% of the population and could be improved by specializing in the top 2 product lines i.e. food & beverages and fashion accessories.
+
+aggregate(invoice.id ~ gender + rating_category,
+          data = branches_reordered,
+          FUN = length)
+
+#Most high ratings were from females while most low ratings were from males. Business could solicit feedback from more males e.g through surveys so they can improve on what they don't like about the products.
+
+aggregate(invoice.id ~ customer.type + rating_category,
+          data = branches_reordered,
+          FUN = length)
+
+#Most high & low rating were both from members. Normal customers had the most ratings in medium category, thus the business may consider targeted marketing among normal customers so they can reduce the number of medium ratings
+
+#b.About products & customers
+
+aggregate(invoice.id ~ product.line + customer.type,
+          data = branches_reordered,
+          FUN = length)
+
+#Most members buy Food & beverages while most normal customers buy electronic & fashion accessories.
+#The business should give more offers for the electronic & fashion accessories to members so they could buy more of that too.
+
+aggregate(invoice.id ~ product.line + gender,
+          data = branches_reordered,
+          FUN = length)
+
+#The product.line that's more popular among females is fashion accessories & health & beauty among males. 
+#The business could stock up more of health & beauty products for males. The low ratings from men could be attributed to this because it's assumed that more health & beauty products would be bought by females compared to males.
+#This may lead to business not stocking up well leading to dissatisfaction among male customers.
+
+aggregate(invoice.id ~ product.line + city,
+          data = branches_reordered,
+          FUN = length)
+
+#The most popular product.lines are Fashion accessories, Home and lifestyle & Food and beverages in the cities of Abuja, Lagos & Port Harcourt respectively.
+#Branches should stock up with more of these products accordingly.
+
+#c.About revenue
+
+revenue_summary <- branches_reordered %>%
+  group_by(product.line) %>%
+  summarise(
+    sum_revenue = sum(total.price.with.tax),
+    average_revenue = mean(total.price.with.tax)
+  ) %>%
+  arrange(-sum_revenue) #substitute average with sum & v.versa
+
+View(revenue_summary)
+
+#Product line that generated the most revenue was Food and beverages, at over 20 million naira, followed by Sports and travel with over 19.8 million naira.
+#Health & beauty products generated the least revenue, probably for reasons that had been stated earlier, related to poor stocking of male products who were the most dissatisfied especially with this product line. 
+#The highest average revenue is for Home and lifestyle products i.e. over 121,000, followed by Sports and travel with over 119,000
+#The branches should therefore do the most to maintain sales for Food and beverages, Sports and travel & Home and lifestyle products at a high.
+
+#d. About date & time
+
+branches_reordered <- branches_reordered %>%
+  mutate(
+    month = month(standard_date, label=TRUE)
+  )
+
+#Revenue for each month
+
+monthly_summary <- branches_reordered %>%
+  group_by(month) %>%
+  summarise(
+    sum_revenue = sum(total.price.with.tax),
+    average_revenue = mean(total.price.with.tax)
+  ) %>%
+  arrange(-average_revenue)
+
+View(monthly_summary)
+
+#Jan had the highest total revenues followed by Mar then Feb. On average, Jan still had the highest revenue
+
+aggregate(invoice.id ~ product.line + month,
+          data = branches_reordered,
+          FUN = length)
+
+#Sports and travel sold the most in Jan
+
+#Extract hour from each time 
+
+branches_reordered <- branches_reordered %>%
+  mutate(
+    hour = hour(standard_time)
+  )
+
+payment_per_hour <- branches_reordered %>%
+  group_by(hour) %>%
+  summarise(
+    invoice_count = length(invoice.id)
+  )
+
+View(payment_per_hour)
+
+#The time here refers to time payment was made. Most payments were made in the 19th hour of the day. Many payments were also made in the 10th, 13th & 15th hours.
+#These implies that many people prefer to make payments for their invoices during their break times if they're at work or after work.
+#This could help the businesses decide what times they need more staff, also which payment modes are easier & quicker for both client & business.
+
+#e. About payment methods
+
+payment_method <- branches_reordered %>%
+  group_by(payment) %>%
+  summarise(
+    invoice_count = length(invoice.id)
+  )
+
+View(payment_method)
+
+
+aggregate(invoice.id ~ payment + hour,
+          data = branches_reordered,
+          FUN = length)
+
+#epay and cash seem to be the most favorable during those hours when most payments are made
+#therefore the systems need to be up, especially during the 19th, 10th, 13th & 15th hours. Staff also need to be avaible during those times to receive the cash.
+
+#Visualizations
+
+library(ggplot2)
+
+branches_reordered %>%
+  ggplot(aes(x = city,fill = product.line)) +
+  geom_bar() +
+  labs(y="invoice count",
+       title = "invoice count per city")
+
+branches_reordered %>%
+  ggplot(aes(x = product.line, y = total.price.with.tax, fill = city)) +
+  geom_col()
+
+
+branches_reordered %>%
+  ggplot(aes(x=rating, color=product.line)) +
+  geom_density()
+
+branches_reordered %>%
+  ggplot(aes(x=product.line, y=rating)) +
+  geom_boxplot()
+
+
+
+
+
+
