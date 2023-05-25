@@ -14,9 +14,9 @@ library(tidyverse)
 #Importing data sets
 
 ```{r}
-abuja <- read.csv("D:/BENA/Data Analytics/Projects/EDA_TAMP2023/Abuja_Branch.csv")
-lagos <- read.csv("D:/BENA/Data Analytics/Projects/EDA_TAMP2023/Lagos_Branch.csv")
-port_harcourt <- read.csv("D:/BENA/Data Analytics/Projects/EDA_TAMP2023/Port_Harcourt_Branch.csv")
+abuja <- read.csv("./Abuja_Branch.csv")
+lagos <- read.csv("./Lagos_Branch.csv")
+port_harcourt <- read.csv("./Port_Harcourt_Branch.csv")
 ```
 
 #Confirming compatibility before combining data sets
